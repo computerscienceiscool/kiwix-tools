@@ -29,10 +29,10 @@ using namespace std;
 
 enum supportedAction { NONE, ADD, SHOW, REMOVE };
 
-void show(kiwix::Library* library, const std::string& bookId)
+void show(const kiwix::Library& library, const std::string& bookId)
 {
   try {
-    auto& book = library->getBookById(bookId);
+    auto& book = library.getBookById(bookId);
     std::cout << "id:\t\t" << book.getId() << std::endl
               << "path:\t\t" << book.getPath() << std::endl
               << "url:\t\t" << book.getUrl() << std::endl
@@ -96,24 +96,24 @@ void usage()
             << std::endl;
 }
 
-int handle_show(kiwix::Library* library, const std::string& libraryPath,
+int handle_show(kiwix::ConstLibraryPtr library, const std::string& libraryPath,
                  int argc, char* argv[])
 {
   if (argc > 3 ) {
     for(auto i=3; i<argc; i++) {
        std::string bookId = argv[i];
-       show(library, bookId);
+       show(*library, bookId);
     }
   } else {
     auto booksIds = library->getBooksIds();
     for(auto& bookId: booksIds) {
-      show(library, bookId);
+      show(*library, bookId);
     }
   }
   return(0);
 }
 
-int handle_add(kiwix::Library* library, const std::string& libraryPath,
+int handle_add(kiwix::LibraryPtr library, const std::string& libraryPath,
                 int argc, char* argv[])
 {
   string zimPath;
@@ -182,7 +182,7 @@ int handle_add(kiwix::Library* library, const std::string& libraryPath,
   return(resultCode);
 }
 
-int handle_remove(kiwix::Library* library, const std::string& libraryPath,
+int handle_remove(kiwix::LibraryPtr library, const std::string& libraryPath,
                    int argc, char* argv[])
 {
   std::string bookId;
@@ -216,7 +216,7 @@ int main(int argc, char** argv)
 {
   string libraryPath = "";
   supportedAction action = NONE;
-  kiwix::Library library;
+  auto library = kiwix::Library::create();
 
   /* General argument parsing */
   static struct option long_options[] = {
@@ -261,7 +261,7 @@ int main(int argc, char** argv)
   libraryPath = kiwix::isRelativePath(libraryPath)
                     ? kiwix::computeAbsolutePath(kiwix::getCurrentDirectory(), libraryPath)
                     : libraryPath;
-  kiwix::Manager manager(&library);
+  kiwix::Manager manager(library);
   if (!manager.readFile(libraryPath, false)) {
     if (kiwix::fileExists(libraryPath) || action!=ADD) {
       std::cerr << "Cannot read the library " << libraryPath << std::endl;
@@ -273,13 +273,13 @@ int main(int argc, char** argv)
   int exitCode = 0;
   switch (action) {
     case SHOW:
-      exitCode = handle_show(&library, libraryPath, argc, argv);
+      exitCode = handle_show(library, libraryPath, argc, argv);
       break;
     case ADD:
-      exitCode = handle_add(&library, libraryPath, argc, argv);
+      exitCode = handle_add(library, libraryPath, argc, argv);
       break;
     case REMOVE:
-      exitCode = handle_remove(&library, libraryPath, argc, argv);
+      exitCode = handle_remove(library, libraryPath, argc, argv);
       break;
     case NONE:
       break;
@@ -292,7 +292,7 @@ int main(int argc, char** argv)
   /* Rewrite the library file */
   if (action == REMOVE || action == ADD) {
     // writeToFile return true (1) if everything is ok => exitCode is 0
-    if (!library.writeToFile(libraryPath)) {
+    if (!library->writeToFile(libraryPath)) {
       std::cerr << "Cannot write the library " << libraryPath << std::endl;
       return 1;
     }
